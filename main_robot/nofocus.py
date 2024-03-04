@@ -192,8 +192,8 @@ class ErebusRobot:
             self.detect_victim(self.camera_right, 'right')
             self.detect_victim(self.camera_centre, 'front')
 
-            self.wheel_left.setVelocity((-self.max_velocity/2 if angle < 0 else self.max_velocity/2) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
-            self.wheel_right.setVelocity((self.max_velocity/2 if angle < 0 else -self.max_velocity/2) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
+            self.wheel_left.setVelocity((-self.max_velocity if angle < 0 else self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
+            self.wheel_right.setVelocity((self.max_velocity if angle < 0 else -self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
 
         self.wheel_left.setVelocity(0)
         self.wheel_right.setVelocity(0)
@@ -454,7 +454,7 @@ class ErebusRobot:
             print(*i, sep='')
         print('===')
 
-    #-----------------------------------camera---------------
+    #-----------------------------------camera-----------------------------------
 
     def send(self, info, x, y):
         for i in self.victim_locations:
@@ -496,6 +496,7 @@ class ErebusRobot:
             break
     
     def letterDetection(self, input_array, pos):
+        print('letter-detection')
         x = len(input_array[0]) // 2
         y = len(input_array) // 2
         if input_array[y][x] <= 50:
@@ -515,6 +516,14 @@ class ErebusRobot:
         img = np.array(np.frombuffer(image_data, np.uint8).reshape((camera.getHeight(), camera.getWidth(), 4)))
         img[:,:,2] = np.zeros([img.shape[0], img.shape[1]])
 
+        '''if camera_pos == 'front':
+            print(img[-1][-1])'''
+        '''
+            with open('image.txt', 'w') as f:
+                f.write('\n'.join([''.join([str(x) for x in i]) for i in img]))'''
+            
+
+
         #convert from BGR to HSV color space
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
@@ -523,7 +532,9 @@ class ErebusRobot:
         #red (70, 0, 0, 255)
         #apply threshold
         thresh = cv.threshold(gray, 140, 255, cv.THRESH_BINARY)[1]
-        thresh_white = cv.inRange(img, (150, 150, 0, 0), (190, 190, 30, 255))
+        thresh_white1 = cv.inRange(img, (160, 160, 0, 0), (191, 191, 30, 255))
+        thresh_white2 = cv.inRange(img, (193, 193, 0, 0), (210, 210, 30, 255))
+        thresh_white = cv.bitwise_or(thresh_white1, thresh_white2)
         thresh_red = cv.inRange(img, (60, 0, 0, 0), (110, 30, 30, 255))
         # draw all contours in green and accepted ones in red
         contours, h = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -533,6 +544,20 @@ class ErebusRobot:
         #cv.imshow("tresh_red", thresh_red)
         #cv.waitKey(0)
         
+        '''if camera_pos == 'front':
+            print(' ')
+            print(' ')
+            print(' ')
+            print(' ')
+            print(' ')
+            print(' ')
+            print('\n'.join([''.join([str([x[0], x[1], x[2]]) for x in i]) for i in img]))
+            for i in thresh_white1:
+                print([x for x in i])
+            for i in thresh_white2:
+                print([x for x in i])
+            for i in thresh_white:
+                print([x for x in i])'''
         
         pos = [int(i) for i in (lambda x: [round(x[0] / self.tile, 0) * self.tile, round(x[1] / self.tile, 0) * self.tile])(self.get_gps_coords(3))]
         
@@ -548,11 +573,12 @@ class ErebusRobot:
 
         for c in contours_white:
             if cv.contourArea(c) >= 20:
+                print('P or C:', cv.contourArea(c))
                 M = cv.moments(c)
                 cX = int(M["m10"] / M["m00"])
                 if (800 > cv.contourArea(c) > 500 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
                     self.send('P', pos[0], pos[1])
-                elif (800 > cv.contourArea(c) > 100 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
+                elif (500 >= cv.contourArea(c) > 100 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
                     self.send('C', pos[0], pos[1])
 
         for c in contours_red:
