@@ -641,7 +641,7 @@ class Robot0(ErebusRobot):
                 if not tile_center[0] - 0.7 <= gps[0] <= tile_center[0] + 0.7:
                     print('stabilization x', gps)
                     self.rotation(90)
-                    self.movement(0.1 if gps[0] < tile_center[0] else -0.1)
+                    self.movement(0.1 if gps[0] > tile_center[0] else -0.1)
                     self.rotation(-90)
                 if not tile_center[1] - 0.7 <= gps[1] <= tile_center[1] + 0.7:
                     print('stabilization y', gps, tile_center)
