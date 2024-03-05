@@ -152,6 +152,8 @@ class ErebusRobot:
             if ((gps >= target_gps and tiles * -(dir[0] if dir[0] in [1, -1] else dir[1]) > 0) or (gps <= target_gps and tiles * -(dir[0] if dir[0] in [1, -1] else dir[1]) < 0) or (self.get_surface() in ([2, 8, 9] if not self.room4 else [2]) and tiles > 0)) or self.is_lack_of_progress():  
                 self.passed = abs(gps - last_gps) / (self.tile * 2)
                 break
+            if self.ds_front_left.getValue() <= 0.08 or self.ds_front_right.getValue() <= 0.08 or self.ds_front_centre_left.getValue() <= 0.08 or self.ds_front_centre_right.getValue() <= 0.08:
+                print('obstacle')
             if 1 <= abs(gps - target_gps) <= 3 and self.ds_right_front.getValue() <= 0.12 and self.ds_right_back.getValue() >= 0.12 and not right_wall:
                 right_wall = True
                 self.wall_positions.append((start_gps[0] - self.axes[(heading + 315) % 360][0] * self.tile, start_gps[1] - self.axes[(heading + 315) % 360][1] * self.tile))
@@ -192,8 +194,8 @@ class ErebusRobot:
             self.detect_victim(self.camera_right, 'right')
             self.detect_victim(self.camera_centre, 'front')
 
-            self.wheel_left.setVelocity((-self.max_velocity if angle < 0 else self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
-            self.wheel_right.setVelocity((self.max_velocity if angle < 0 else -self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 15 else 0.1))
+            self.wheel_left.setVelocity((-self.max_velocity if angle < 0 else self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 10 else 0.05))
+            self.wheel_right.setVelocity((self.max_velocity if angle < 0 else -self.max_velocity) * (1 if abs(angle) - abs(gyro - last_gyro) > 10 else 0.05))
 
         self.wheel_left.setVelocity(0)
         self.wheel_right.setVelocity(0)
@@ -574,13 +576,13 @@ class ErebusRobot:
             if cv.contourArea(c) >= 20:
                 M = cv.moments(c)
                 cX = int(M["m10"] / M["m00"])
-                if (800 > cv.contourArea(c) > 500 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
+                if (800 > cv.contourArea(c) > 500 and self.camera_pos_ds[camera_pos].getValue() <= 0.1 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
                     self.send('P', pos[0], pos[1])
-                elif (500 >= cv.contourArea(c) > 100 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
+                elif (500 >= cv.contourArea(c) > 100 and self.camera_pos_ds[camera_pos].getValue() <= 0.1 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
                     self.send('C', pos[0], pos[1])
 
         for c in contours_red:
-            if cv.contourArea(c) > 50 and self.camera_pos_ds[camera_pos].getValue() <= 0.12:
+            if cv.contourArea(c) > 50 and self.camera_pos_ds[camera_pos].getValue() <= 0.1:
                 self.wheel_left.setVelocity(0)
                 self.wheel_right.setVelocity(0)
 
@@ -632,6 +634,8 @@ class Robot0(ErebusRobot):
                 self.wall_update()
                 self.not_visited = [i for i in self.not_visited if i not in self.visited]
                 gps = self.get_gps_coords(3)
+                angle = ((round(self.get_gyro_angle() / 90, 0) * 90) % 360 + 360) % 360 
+                print(angle, self.get_gyro_angle())
                 tile_center = (lambda x: (round(x[0] / self.tile, 0) * self.tile, round(x[1] / self.tile, 0) * self.tile))(self.get_gps_coords(3))
                 print(tile_center)
 
@@ -640,14 +644,24 @@ class Robot0(ErebusRobot):
                 
                 if not tile_center[0] - 0.7 <= gps[0] <= tile_center[0] + 0.7:
                     print('stabilization x', gps)
-                    self.rotation(90)
-                    self.movement(0.1 if gps[0] > tile_center[0] else -0.1)
-                    self.rotation(-90)
+                    if angle == 0:
+                        self.rotation(90)
+                        self.movement(0.1 if gps[0] > tile_center[0] else -0.1)
+                        self.rotation(-90)
+                    else:
+                        self.rotation(90)
+                        self.movement(0.1 if gps[0] < tile_center[0] else -0.1)
+                        self.rotation(-90)
                 if not tile_center[1] - 0.7 <= gps[1] <= tile_center[1] + 0.7:
                     print('stabilization y', gps, tile_center)
-                    self.rotation(90)
-                    self.movement(0.1 if gps[1] > tile_center[1] else -0.1)
-                    self.rotation(-90)
+                    if angle == 90:
+                        self.rotation(90)
+                        self.movement(0.1 if gps[1] < tile_center[1] else -0.1)
+                        self.rotation(-90)
+                    else:
+                        self.rotation(90)
+                        self.movement(0.1 if gps[1] > tile_center[1] else -0.1)
+                        self.rotation(-90)
                 
                 if (self.ds_front_left.getValue() <= 0.12 or self.ds_front_right.getValue() <= 0.12) and (self.ds_left_back.getValue() <= 0.12 or self.ds_left_front.getValue() <= 0.12) and (self.ds_right_back.getValue() <= 0.12 or self.ds_right_front.getValue() <= 0.12) and not (self.ds_front_left.getValue() > 0.12 and self.ds_left_front.getValue() > 0.12) and not (self.ds_front_right.getValue() > 0.12 and self.ds_right_front.getValue() > 0.12):
                     print('180')
