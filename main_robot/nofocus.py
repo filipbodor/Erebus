@@ -13,7 +13,7 @@ class ErebusRobot:
         self.angle = 0
         self.max_velocity = 6.28
         self.tile = 6
-        self.room4 = False
+        self.room4 = True
         self.map_matrix = [['5', '0', '5'],
                            ['0', '0', '0'],
                            ['5', '0', '5']]
@@ -496,7 +496,6 @@ class ErebusRobot:
             break
     
     def letterDetection(self, input_array, pos):
-        print('letter-detection')
         x = len(input_array[0]) // 2
         y = len(input_array) // 2
         if input_array[y][x] <= 50:
@@ -573,7 +572,6 @@ class ErebusRobot:
 
         for c in contours_white:
             if cv.contourArea(c) >= 20:
-                print('P or C:', cv.contourArea(c))
                 M = cv.moments(c)
                 cX = int(M["m10"] / M["m00"])
                 if (800 > cv.contourArea(c) > 500 and self.camera_pos_ds[camera_pos].getValue() <= 0.12 and int(len(img[0]) * 0.25) <= cX <= int(len(img[0]) * 0.75)):
@@ -582,7 +580,6 @@ class ErebusRobot:
                     self.send('C', pos[0], pos[1])
 
         for c in contours_red:
-            print(cv.contourArea(c))
             if cv.contourArea(c) > 50 and self.camera_pos_ds[camera_pos].getValue() <= 0.12:
                 self.wheel_left.setVelocity(0)
                 self.wheel_right.setVelocity(0)
@@ -602,7 +599,8 @@ class ErebusRobot:
         img = np.array(np.frombuffer(image_data, np.uint8).reshape((camera.getHeight(), camera.getWidth(), 4)))
         img[:,:,2] = np.zeros([img.shape[0], img.shape[1]])
 
-        return (img[-1][4][0] in range(0, 25) and img[-1][4][1] in range(0, 25) and img[-1][4][2] in range(0, 25) or img[-1][-4][0] in range(0, 25) and img[-1][-4][1] in range(0, 25) and img[-1][-4][2] in range(0, 25))
+        return ((img[-1][4][0] in range(0, 25) and img[-1][4][1] in range(0, 25) and img[-1][4][2] in range(0, 25))
+             or (img[-1][-4][0] in range(0, 25) and img[-1][-4][1] in range(0, 25) and img[-1][-4][2] in range(0, 25)))
 
 
 
@@ -629,57 +627,67 @@ class Robot0(ErebusRobot):
     def while_algorithm(self): 
         try:   
             while self.robot.step(self.timestep) != -1:
+                
                 self.graph_update()
                 self.wall_update()
                 self.not_visited = [i for i in self.not_visited if i not in self.visited]
                 gps = self.get_gps_coords(3)
                 tile_center = (lambda x: (round(x[0] / self.tile, 0) * self.tile, round(x[1] / self.tile, 0) * self.tile))(self.get_gps_coords(3))
-                
+                print(tile_center)
 
                 if self.get_surface() in ([2, 8, 9] if not self.room4 else [2]):
                     self.movement(-self.passed)
                 
                 if not tile_center[0] - 0.7 <= gps[0] <= tile_center[0] + 0.7:
+                    print('stabilization x', gps)
                     self.rotation(90)
                     self.movement(0.1 if gps[0] < tile_center[0] else -0.1)
                     self.rotation(-90)
                 if not tile_center[1] - 0.7 <= gps[1] <= tile_center[1] + 0.7:
+                    print('stabilization y', gps, tile_center)
                     self.rotation(90)
-                    self.movement(0.1 if gps[1] < tile_center[1] else -0.1)
+                    self.movement(0.1 if gps[1] > tile_center[1] else -0.1)
                     self.rotation(-90)
                 
                 if (self.ds_front_left.getValue() <= 0.12 or self.ds_front_right.getValue() <= 0.12) and (self.ds_left_back.getValue() <= 0.12 or self.ds_left_front.getValue() <= 0.12) and (self.ds_right_back.getValue() <= 0.12 or self.ds_right_front.getValue() <= 0.12) and not (self.ds_front_left.getValue() > 0.12 and self.ds_left_front.getValue() > 0.12) and not (self.ds_front_right.getValue() > 0.12 and self.ds_right_front.getValue() > 0.12):
+                    print('180')
                     self.rotation(180)
 
                 if self.ds_front_left.getValue() > 0.12 and self.ds_front_centre_left.getValue() > 0.12  and self.ds_front_centre_right.getValue() > 0.12 and self.ds_front_right.getValue() > 0.12 and self.is_not_visited(0) and not self.is_hole(self.camera_centre, 'centre'):
                     self.add_visited()
+                    print('straight')
                     self.movement(0.5)
                     self.mapping()
                 
                 elif self.ds_right_front.getValue() > 0.12 and self.ds_right_back.getValue() <= 0.12 and self.ds_front_right.getValue() > 0.12 and self.ds_front_left.getValue() <= 0.12 and self.is_not_visited(315):
                     self.rotation(-45)
+                    print('45')
                     self.add_visited()
                     self.movement(1)
                     self.rotation(45)
 
                 elif self.ds_left_front.getValue() > 0.12 and self.ds_left_back.getValue() <= 0.12 and self.ds_front_left.getValue() > 0.12 and self.ds_front_right.getValue() <= 0.12 and self.is_not_visited(45):
                     self.rotation(45)
+                    print('45')
                     self.add_visited()
                     self.movement(1)
                     self.rotation(-45)
 
                 elif self.ds_right_front.getValue() > 0.12 and self.ds_right_back.getValue() > 0.12 and self.is_not_visited(270) and not self.is_hole(self.camera_right, 'right'):
                     self.rotation(-90)
+                    print('right')
                     self.mapping()
 
                 elif self.ds_left_front.getValue() > 0.12 and self.ds_left_back.getValue() > 0.12 and self.is_not_visited(90) and not self.is_hole(self.camera_left, 'left'):
                     self.rotation(90)
+                    print('left')
                     self.mapping()
 
                 else:
                     if self.not_visited == []:
                         break
                     else:
+                        print('coming back')
                         self.get_to_position(self.find_closest_not_visited_position(self.not_visited), False)
         except Exception:
             self.send_map()
